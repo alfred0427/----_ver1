@@ -8,7 +8,7 @@
 - 📊 匯入與更新因子資料（自動整併舊檔與新資料）  
 - ⚙️ 依時期生成完整因子報酬績效報表  
 - 🔥 分析各因子近期表現、視覺化比較結果  
-- 📅 查詢當期投資組合持股清單  
+- 📅 查詢當期投資組合持股清單 
 - 💡 分析投組中最具貢獻的個股與報酬分布  
 
 本系統適用於**台股量化投資策略研究、因子有效性測試、或投組績效歸因分析**。
@@ -49,7 +49,7 @@
 
 1️⃣ 手動更新 `更新因子.xlsx`（從 Cmoney 匯入最新資料）  
 ⬇️  
-2️⃣ 執行 `update_data.ipynb`（將新資料整併至 `merged_csvs/`）  
+2️⃣ 執行 `update_data.ipynb` =>runall（將新資料整併至 `merged_csvs/`）  
 ⬇️  
 3️⃣ 開啟 `main.ipynb`（主要操作平台）  
 ⬇️  
@@ -104,7 +104,7 @@ perf_table = perf_report(returns_dict, "2024-01-01", "2024-12-31")
 ---
 
 ## 函數2：最近一年因子月表現熱力圖  
-（`factor_rank_tile` / `factor_rank_tile_full`）
+（`factor_rank_tile_full`）
 
 **功能**  
 顯示各因子在每期（月、週、年）中的單期報酬排名，  
@@ -112,7 +112,7 @@ perf_table = perf_report(returns_dict, "2024-01-01", "2024-12-31")
 
 **定義**
 ```python
-def factor_rank_tile(
+def factor_rank_tile_full(
     returns_dict: dict,
     end_date: str | None = None,
     periods: int = 12,
@@ -138,7 +138,7 @@ def factor_rank_tile(
 
 **範例**
 ```python
-factor_rank_tile(
+factor_rank_tile_full(
     returns_dict=factor_returns_dict,
     end_date="2025-09-30",
     periods=12,
@@ -179,43 +179,61 @@ print(tickers)
 ---
 
 ## 函數4：投資組合貢獻最多的個股  
-（`top_contributors_report`）
 
-**功能**  
-分析指定區間內各股票對投組整體績效的貢獻度，  
-同時計算年化報酬、波動、Sharpe Ratio 與區間報酬。
 
-**定義**
+（`porfolio_list_period`）
+
+## 🧩 功能說明
+此函數用於找出在指定期間內最常被選入投資組合（alpha矩陣中為 1 次數最多）的股票，
+並根據這些股票生成投資組合貢獻報表。  
+可用於觀察「長期被選中」的核心持股表現與貢獻。
+
+---
+
+## 🧠 函數定義
 ```python
-def top_contributors_report(
-    returns, tickers, start_date, end_date,
-    weights=None, top_n=10, annualize=252, risk_free_annual=0.0
-)
+def porfolio_list_period(alpha, start, end, num=30):
+    selected_days = alpha.loc[start:end].sum(axis=0)
+    t = selected_days.sort_values(ascending=False).head(num).index
+    tickers = t
+    stats_df, port_ret = top_contributors_report(
+        returns, tickers, start_date=start, end_date=end, top_n=10
+    )
+    return stats_df
 ```
 
-**參數**
+---
+
+## ⚙️ 參數說明
+
 | 參數 | 型態 | 說明 |
 |------|------|------|
-| `returns` | pd.DataFrame | index=日期, columns=股票代號, 值=日報酬率 |
-| `tickers` | list[str] | 投組成分股 |
-| `start_date`, `end_date` | str | 分析區間 |
-| `weights` | dict[str, float] | 權重設定（預設等權） |
-| `top_n` | int | 顯示前 N 名貢獻者 |
-| `annualize` | int | 年化基數（252） |
-| `risk_free_annual` | float | 年化無風險利率 |
+| `alpha` | pd.DataFrame | 選股訊號矩陣（index=日期, columns=股票代號, 值=0/1） |
+| `start`, `end` | str | 指定分析期間（格式：`YYYY-MM-DD`） |
+| `num` | int | 取出在期間內出現次數最多的前 N 檔股票（預設 30） |
 
-**輸出**
-- Bar Chart：前 N 名貢獻個股  
-- DataFrame：各股績效指標與投組報酬貢獻  
-- Float：投組期間總報酬  
+---
 
-**範例**
+## 📤 輸出結果
+
+- `pd.DataFrame`：`top_contributors_report()` 產生的報表，包含：  
+  - `Annual Return`（年化報酬）  
+  - `Annual Volatility`（年化波動）  
+  - `Sharpe Ratio`（夏普比率）  
+  - `Period Return`（區間報酬）  
+  - `Contribution`（對投組貢獻）  
+
+---
+
+## 💡 使用範例
+
 ```python
-stats_df, port_ret = top_contributors_report(
-    returns=returns,
-    tickers=["2330", "2317", "2882", "2603"],
-    start_date="2024-01-01",
-    end_date="2024-12-31",
-    top_n=10
+# 分析 2024 全年度中最常被 alpha 訊號選入的前 30 檔股票
+stats_df = porfolio_list_period(
+    alpha=pe_low_01_alpha,
+    start="2024-01-01",
+    end="2024-12-31",
+    num=30
 )
+print(stats_df.head(10))
 ```
